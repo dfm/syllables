@@ -87,10 +87,15 @@ decides what to do with it.
   arr" = 2, which also matches "for real"). Dotted Latin abbrevs (`e.g.`,
   `i.e.`) split into letters and read spelled ("ee jee" = 2); `etc.` →
   cmudict "et cetera" = 4.
-- **Roman numerals abstain.** `II`/`IV`/`VIII` are genuinely ambiguous
-  ("World War II" = two vs "Henry VIII" = the eighth), so an all-caps
-  ≥2-char valid-Roman token that isn't a real cmudict word abstains rather
-  than guess. (`MIX` is a real word → counted normally, not as 1009.)
+- **Small Roman numerals get a default cardinal reading; larger ones
+  abstain.** An all-caps ≥2-char valid-Roman token that isn't a real
+  cmudict word and is **≤ 10** reads as the cardinal ("World War II" →
+  *two*, "Star Wars IV" → *four*), marked `approx` because cardinal-vs-
+  ordinal is a guess about intent — though for 3–10 both readings have
+  the same syllable count, so only `II` ("two"=1 vs "second"=2) actually
+  trades a little precision for coverage. **> 10** still abstains (the
+  ambiguity compounds and big numerals are rarer / more numeral-like).
+  (`MIX` is a real cmudict word → counted normally, not as 1009.)
 - **Diacritic folding.** A NFKD accent-stripped candidate is tried in the
   cmudict tier, so `café`/`naïve`/`jalapeño` resolve **exact**. Words like
   `résumé` whose fold (`resume`) has disagreeing cmudict variants still

@@ -20,6 +20,8 @@ not add `sys.path` manipulation**).
 uv run python -m unittest discover -s tests          # all tests
 uv run python -m unittest tests.test_heuristics.CLASS.test_x   # one test
 uv run python -m syllables.heuristics "text…"        # per-token audit trace
+uv run python scripts/explain.py ["text…" | -]       # full cross-layer pipeline tour
+uv run python scripts/explain.py --firehose          # same, on live Bluesky (opt. atproto)
 uv run python scripts/infer.py                       # slang probe (packaged weights)
 
 # Train the deployable model (writes the packaged artifact, no holdout):

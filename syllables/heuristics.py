@@ -801,11 +801,16 @@ _EMOTICON = re.compile(
     r"[oO0]_[oO0]|[oO]\.[oO]|[tT]_[tT]|[tT]\.[tT]|;_;"
 )
 
-# Strict Roman numeral (1-3999). Only treated as one when the raw token is
-# all-uppercase, length>=2, and not a real cmudict word -- otherwise II/IV/
-# VIII are genuinely ambiguous (cardinal vs ordinal: "World War II" = two
-# vs "Henry VIII" = the eighth), so we abstain rather than guess.
+# Strict Roman numeral (1-3999). Only treated as one when the raw token
+# is all-uppercase, length>=2, and not a real cmudict word. Small values
+# (<= ROMAN_MAX) get a default *cardinal* reading ("World War II" -> two,
+# "Star Wars IV" -> four), marked approx since the cardinal/ordinal
+# choice is a guess about intent -- though for 3..10 both readings have
+# the same syllable count anyway, so only II ("two"=1 vs "second"=2) is
+# a real coverage-for-precision trade. Larger values stay an abstention
+# (the ambiguity compounds and big numerals are rarer / more numeral-y).
 _ROMAN = re.compile(r"M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})\Z")
+ROMAN_MAX = 10
 
 # Unambiguous slash-shorthand -> words (then exact via cmudict).
 SHORTHAND = {"w/o": ["without"], "w/": ["with"], "b/c": ["because"]}
@@ -962,8 +967,9 @@ def _expand_url(u: str) -> list[str]:
 
 def _classify_word(raw: str) -> Token:
     base = raw.strip("'’-")
-    # Roman numeral: only when ALL-CAPS, >=2 chars, and not a real word --
-    # genuinely ambiguous (II = "two" vs "the second"), so abstain.
+    # Roman numeral: only when ALL-CAPS, >=2 chars, and not a real word.
+    # Small values -> a default cardinal reading (approx); larger ones
+    # stay an abstention -- the cardinal/ordinal ambiguity compounds.
     if (
         len(base) >= 2
         and base.isupper()
@@ -971,6 +977,12 @@ def _classify_word(raw: str) -> Token:
         and _ROMAN.match(base)
         and _cmu_count(base.lower()) is None
     ):
+        v = _roman_value(base)
+        if 1 <= v <= ROMAN_MAX:
+            return Token(
+                raw=raw, kind="number", words=cardinal(v), approx=True,
+                note="roman numeral",
+            )
         return Token(
             raw=raw, kind="word", candidates=[], note="roman numeral (ambiguous)"
         )

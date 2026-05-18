@@ -251,9 +251,23 @@ class Extras(unittest.TestCase):
             self.assertTrue(r.confident, smart)
             self.assertEqual(r.total, n, smart)
 
-    def test_roman_numerals_abstain(self):
-        self.assertFalse(total("World War II").confident)
-        self.assertFalse(total("Henry VIII").confident)
+    def test_roman_numerals(self):
+        # small (<= ROMAN_MAX) -> default cardinal reading, confident but
+        # marked approx (the cardinal/ordinal choice is a guess).
+        for s, n in [("World War II", 3),   # world war two
+                     ("Henry VIII", 3),     # hen-ry eight
+                     ("Star Wars IV", 3),   # star wars four
+                     ("Final Fantasy VII", 7)]:  # fi-nal fan-ta-sy se-ven
+            r = total(s)
+            self.assertTrue(r.confident, s)
+            self.assertEqual(r.total, n, s)
+        rom = next(c for c in total("World War II").tokens if c.raw == "II")
+        self.assertEqual(rom.confidence, "approx")
+        self.assertEqual(rom.count, 1)                  # "two"
+        # larger numerals stay an abstention (ambiguity compounds)
+        self.assertFalse(total("Super Bowl LVIII").confident)  # 58
+        self.assertFalse(total("section XV").confident)        # 15
+        self.assertFalse(total("year MMXXIV").confident)       # 2024
         # a real word that happens to be valid Roman is NOT treated so
         self.assertEqual(total("MIX").total, 1)
         self.assertTrue(total("MIX").confident)
