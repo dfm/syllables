@@ -122,13 +122,15 @@ decides what to do with it.
   closest cmudict word is required — a tie abstains. A wrong correction is
   a silent wrong count, which is worse than no answer.
 - **Unified reference, not cmudict alone.** Tier 3 is the reconciled
-  CMUdict+WikiPron+kaikki table, consumed read-only via `data`
-  (composition, word count, source priority, and the soft-uniform loss:
-  `architecture.md` §4 — the canonical data writeup). It falls back to
-  cmudict-only if the WikiPron/kaikki extracts are absent. The
-  deterministic-layer payoff, measured on real firehose posts: confident
-  coverage 54.7% → 60.6% with the model off (`rizz`, `skibidi`, `yeet`,
-  `bsky` resolve deterministically).
+  CMUdict+WikiPron+kaikki table (composition, word count, source
+  priority: `architecture.md` §4). It ships **precomputed** as a ~0.46 MB
+  `word→primary` artifact (`lexicon/reference.tsv.xz`, lzma) that
+  `_cmu()` *always* loads — no runtime `data.build_sources()`, no raw
+  sources needed at install; rebuild via `scripts/build_reference.py`
+  when the reconciliation changes (cmudict-only is the last resort).
+  Deterministic-layer payoff on real firehose posts: confident coverage
+  54.7% → 60.6% with the model off (`rizz`, `skibidi`, `yeet`, `bsky`
+  resolve deterministically).
 - **Primary even when ambiguous, not fail-closed.** The reference flags
   genuine ambiguity (`fire`={1,2}, `every`={2,3}; ~1.4% of words). Policy
   here: still emit `primary` for max coverage (the 1.4% risk is accepted)

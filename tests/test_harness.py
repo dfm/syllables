@@ -248,5 +248,38 @@ class ApiSurface(Base):
         )
 
 
+class ShippedReference(unittest.TestCase):
+    """The precomputed lexicon artifact + the installed-package load tier
+    of `_cmu()` (dev path stays `data.build_sources()`)."""
+
+    def test_artifact_present_and_sane(self):
+        import lzma
+        from pathlib import Path
+
+        from syllables import heuristics as h
+
+        ref = (
+            Path(h.__file__).resolve().parent
+            / "lexicon" / "reference.tsv.xz"
+        )
+        self.assertTrue(ref.exists())
+        rows = lzma.decompress(ref.read_bytes()).decode().splitlines()
+        self.assertGreater(len(rows), 150_000)
+        d = dict(r.split("\t") for r in rows)
+        self.assertEqual(d["cat"], "1")
+        self.assertEqual(d["banana"], "3")
+
+    def test_cmu_loads_shipped_artifact(self):
+        # _cmu() always loads the shipped artifact (no build_sources at
+        # runtime) -> source is "ship".
+        from syllables import heuristics as h
+
+        tbl = h._cmu()
+        self.assertEqual(tbl["cat"]["source"], "ship")
+        self.assertEqual(tbl["cat"]["primary"], 1)
+        self.assertEqual(tbl["banana"]["primary"], 3)
+        self.assertGreater(len(tbl), 150_000)
+
+
 if __name__ == "__main__":
     unittest.main()

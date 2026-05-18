@@ -30,21 +30,30 @@ from syllables import count_syllables, harness, heuristics, is_haiku_line
 
 FUZZ = (0.0, 0.25, 0.5, 0.75, 1.0)
 
-# Representative messy lines -- one or two per pipeline feature, so the
-# default run doubles as a tour: numbers/currency/year, emoji/emoticon,
-# slang, ambiguous initialism (abstain), URL bare vs full, contraction,
-# elongation, OOV->model, junk (discard), roman (abstain), a real haiku.
+# Representative messy lines, grouped so the default run is a tour AND
+# actually demonstrates the fuzziness knob. NOTE: deterministic and
+# hard-abstain lines are *expected* to be flat across fuzziness -- the
+# model is never consulted there, so the knob physically cannot move
+# them. Only the model-routed group below makes the sweep diverge.
 CORPUS = [
-    "an old silent pond a frog jumps into the pond splash silence again",
+    # -- deterministic (numbers/currency/year, emoji, slang, contraction,
+    #    elongation, roman expansion): flat by design --
     "I spent $1.2B and £5.99 on 1999 vibes",
     "noooo this is sooo bussin fr 😭🔥",
+    "I'm gonna doomscroll, don't @ me",
+    "World War II started a long time ago",
+    # -- hard-abstain (ambiguous initialism, full URL, junk): all-dashes
+    #    by design, model never consulted --
     "tbh idk why lol",
     "check ebay.com then https://example.com/post?x=1",
-    "I'm gonna doomscroll, don't @ me",
-    "the quick borwn fox blarghhhh",
     "macro: hhFDWkdAxDjkbJfXdOwv",
-    "World War II was a long time ago",
-    "first light over the ridge the kettle starts to whistle a cat ignores it",
+    # -- model-routed: the fuzziness sweep visibly moves, at DIFFERENT
+    #    points (the per-OOV "model :" line shows why) --
+    "doomscrollery is my whole personality now",     # accepts from f=0.25
+    "that situationshippy energy is so exhausting",  # accepts from f=0.25
+    "the quick borwn fox jumps over",                # accepts from f=0.75
+    # -- a real haiku line (deterministic, exactly 5) --
+    "an old silent pond",
 ]
 
 
@@ -58,13 +67,34 @@ def explain_line(line: str) -> None:
     # 2. how the harness routes it
     det, oov, hard = harness._resolve_line(line)
     if hard:
-        routing = "HARD ABSTAIN (roman / ambiguous initialism / junk) -> None"
-    elif oov:
-        routing = (f"det={det} syllables + {len(oov)} OOV -> model: "
-                   f"{', '.join(oov)}")
+        print("\n  routing : HARD ABSTAIN "
+              "(roman / ambiguous initialism / junk) -> None")
+    elif not oov:
+        print(f"\n  routing : fully deterministic, "
+              f"det={det} syllables (no model)")
     else:
-        routing = f"fully deterministic, det={det} syllables (no model)"
-    print(f"\n  routing : {routing}")
+        print(f"\n  routing : det={det} syllables + {len(oov)} OOV "
+              f"-> model: {', '.join(oov)}")
+        # Show each OOV token's model confidence and the lowest fuzziness
+        # that accepts it. The shipped model is deliberately tiny and
+        # often overconfident, so most tokens accept already at f=0 --
+        # which is *why* the sweep below is usually flat (not a bug).
+        mdl = harness._model()
+        if mdl is None:
+            print("  model   : UNAVAILABLE (no jax / weights) -> every "
+                  "OOV line abstains at all fuzziness")
+        else:
+            probs = harness._probs_fixed(mdl, list(oov))
+            for w, p in zip(oov, probs, strict=True):
+                order = p.argsort()[::-1]
+                top, second = float(p[order[0]]), float(p[order[1]])
+                acc = next(f for f in FUZZ
+                           if harness._gate(p, f) is not None)
+                gate = ("accepted at strict f=0" if acc == 0.0
+                        else f"abstains at f=0, accepts from f={acc}")
+                print(f"  model   : {w!r} -> count {int(order[0]) + 1}  "
+                      f"(p={top:.2f}, margin={top - second:.2f})  "
+                      f"{gate}")
     # 3. fuzziness sweep of the final public count
     cells = []
     for f in FUZZ:

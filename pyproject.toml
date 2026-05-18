@@ -15,7 +15,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["syllables"]
-artifacts = ["syllables/weights/model.npz"]
+artifacts = [
+    "syllables/weights/model.npz",
+    "syllables/lexicon/reference.tsv.xz",
+]
 
 [dependency-groups]
 dev = [

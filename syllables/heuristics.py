@@ -1249,23 +1249,44 @@ _VOWELS = set("aeiouy")
 
 @lru_cache(maxsize=1)
 def _cmu() -> dict[str, dict]:
-    """The reference lexicon: the other session's reconciled CMUdict +
-    WikiPron + kaikki(Wiktionary) table (`sources.build()`), ~173k words
-    incl. slang/proper/loanword breadth, sharing the model's training
-    ground truth. Falls back to cmudict-only if the WikiPron/kaikki
-    extracts aren't present, so the pipeline still works without them."""
+    """The reference lexicon (~169k words). Always loads the shipped
+    precomputed artifact `lexicon/reference.tsv.xz` (`word -> primary`;
+    `valid`/`ambiguous` stubbed for shape parity). It is the single
+    runtime source of truth — dev and installed alike — so there is no
+    coupling to `data.build_sources()` at runtime; rebuild the artifact
+    with `scripts/build_reference.py` whenever the reconciliation changes.
+    cmudict-only is a last resort if the artifact can't be read."""
     try:
-        return data.build_sources()
-    except Exception:
-        return {
-            w: {
-                "primary": e["primary"],
-                "valid": frozenset(e["counts"]),
-                "ambiguous": len(set(e["counts"])) > 1,
-                "source": "cmu",
+        import lzma
+        from pathlib import Path
+
+        ref = (
+            Path(__file__).resolve().parent / "lexicon" / "reference.tsv.xz"
+        )
+        text = lzma.decompress(ref.read_bytes()).decode()
+        out = {}
+        for line in text.splitlines():
+            w, _, p = line.partition("\t")
+            n = int(p)
+            out[w] = {
+                "primary": n,
+                "valid": frozenset({n}),
+                "ambiguous": False,
+                "source": "ship",
             }
-            for w, e in data.parse_cmudict().items()
+        if out:
+            return out
+    except Exception:
+        pass
+    return {  # last resort: cmudict-only (raw cmudict.dict must exist)
+        w: {
+            "primary": e["primary"],
+            "valid": frozenset(e["counts"]),
+            "ambiguous": len(set(e["counts"])) > 1,
+            "source": "cmu",
         }
+        for w, e in data.parse_cmudict().items()
+    }
 
 
 @lru_cache(maxsize=1)
